@@ -2,6 +2,7 @@
 Тесты Ragas для оценки качества RAG-пайплайна.
 Проверяет метрики: Faithfulness, Answer Relevance, Context Recall.
 """
+import asyncio
 import json
 import os
 from typing import Dict, List
@@ -158,8 +159,14 @@ def test_ragas_evaluation(goldens, ragas_client):
     for metric in metrics:
         metric.llm = ragas_client["llm"]
         metric.embeddings = ragas_client["embeddings"]
-    
-    # Собираем данные для Ragas
+
+    # Адаптируем prompt answer_relevancy на русский, чтобы сгенерированные
+    # вопросы и эталонный вопрос были на одном языке и similarity была выше.
+    adapted_prompts = asyncio.run(
+        answer_relevancy.adapt_prompts("russian", ragas_client["llm"], adapt_instruction=True)
+    )
+    answer_relevancy.set_prompts(**adapted_prompts)
+
     eval_data = []
     for golden in goldens:
         result = pipeline.run(golden["question"])

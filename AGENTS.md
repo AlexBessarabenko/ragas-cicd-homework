@@ -65,7 +65,7 @@
 ### `tests/test_ragas.py`
 
 - `goldens` (fixture, scope `module`) — загружает `tests/goldens.json`.
-- `ragas_client` (fixture, scope `module`) — настраивает YandexGPT как evaluator LLM и Yandex embeddings для Ragas. Для LLM используется кастомный `YandexChatOpenAI`, который убирает из запроса поля `n`, `stop`, `stream`, `logprobs`, `reasoning` и др., неподдерживаемые YandexGPT OpenAI-совместимым API.
+- `ragas_client` (fixture, scope `module`) — настраивает YandexGPT как evaluator LLM и Yandex embeddings для Ragas. Для LLM используется кастомный `YandexChatOpenAI`, который убирает из запроса поля `n`, `stop`, `stream`, `logprobs`, `reasoning` и др., неподдерживаемые YandexGPT OpenAI-совместимым API. Для embeddings `OpenAIEmbeddings(..., check_embedding_ctx_length=False)` — Yandex Embeddings API принимает строки, а не токены.
 - Тесты:
   1. `test_goldens_exist` — проверяет, что в `goldens.json` не менее 10 примеров.
   2. `test_rag_pipeline_returns_response` — дымовой тест, что пайплайн возвращает непустой ответ.

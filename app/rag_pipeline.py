@@ -13,11 +13,20 @@ load_dotenv()
 API_KEY = os.getenv("YANDEX_API_KEY")
 FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
 
-client = OpenAI(
-    api_key=API_KEY,
-    project=FOLDER_ID,
-    base_url="https://ai.api.cloud.yandex.net/v1"
-)
+# OpenAI >= 2.0 требует api_key при создании клиента, поэтому создаём
+# клиент лениво при первом вызове generate, а не при импорте модуля.
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(
+            api_key=API_KEY or "",
+            project=FOLDER_ID,
+            base_url="https://ai.api.cloud.yandex.net/v1",
+        )
+    return _client
 
 
 class IMDBRAGPipeline:
@@ -72,10 +81,10 @@ class IMDBRAGPipeline:
 
 Ответ:"""
         
-        response = client.chat.completions.create(
+        response = _get_client().chat.completions.create(
             model=f"gpt://{FOLDER_ID}/yandexgpt",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
+            temperature=0.1,
         )
         return response.choices[0].message.content
     

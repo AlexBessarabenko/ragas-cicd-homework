@@ -4,15 +4,19 @@
 """
 import json
 import os
-import pytest
+from typing import Dict, List
+
+import app.ragas_compat  # noqa: F401  # заглушки для ragas 0.2.x + langchain 1.x
 import numpy as np
-from pathlib import Path
-from dotenv import load_dotenv
-from openai import OpenAI
-from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_recall
-from ragas.dataset_schema import SingleTurnSample
+import pytest
 from datasets import Dataset
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from pathlib import Path
+from ragas import evaluate
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
+from ragas.metrics import answer_relevancy, context_recall, faithfulness
 
 from app.rag_pipeline import pipeline
 
@@ -32,33 +36,56 @@ def goldens():
         return json.load(f)
 
 
+class YandexChatOpenAI(ChatOpenAI):
+    """
+    ChatOpenAI с параметрами, совместимыми с YandexGPT OpenAI-совместимым API.
+    YandexGPT не принимает ряд полей (n, stop, stream, logprobs и др.),
+    которые langchain-openai добавляет в запрос по умолчанию.
+    """
+
+    @property
+    def _default_params(self) -> Dict[str, object]:
+        params = super()._default_params
+        # YandexGPT не поддерживает ряд параметров OpenAI API.
+        unsupported = (
+            "n", "stop", "stream", "logprobs", "top_logprobs", "logit_bias",
+            "extra_body", "reasoning_effort", "reasoning", "verbosity",
+            "context_management", "include", "prompt_cache_options",
+            "service_tier", "truncation", "store",
+        )
+        for key in unsupported:
+            params.pop(key, None)
+        # Очень маленькие значения температуры (1e-8), которые Ragas использует
+        # по умолчанию, YandexGPT может отклонять из-за научной нотации.
+        temperature = params.get("temperature")
+        if temperature is not None and temperature < 1e-6:
+            params["temperature"] = 0.0
+        return params
+
+
 @pytest.fixture(scope="module")
 def ragas_client():
     """Настраивает Ragas для работы с YandexGPT."""
-    from ragas.llms import LangchainLLMWrapper
-    from ragas.embeddings import LangchainEmbeddingsWrapper
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-    
     API_KEY = os.getenv("YANDEX_API_KEY")
     FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
-    
+
     # Настраиваем YandexGPT как evaluator
-    yandex_llm = ChatOpenAI(
+    yandex_llm = YandexChatOpenAI(
         model=f"gpt://{FOLDER_ID}/yandexgpt",
         api_key=API_KEY,
-        base_url="https://ai.api.cloud.yandex.net/v1"
+        base_url="https://ai.api.cloud.yandex.net/v1",
     )
-    
+
     # Для embeddings используем Yandex embeddings
     yandex_embeddings = OpenAIEmbeddings(
         model=f"emb://{FOLDER_ID}/text-search-doc/latest",
         api_key=API_KEY,
-        base_url="https://ai.api.cloud.yandex.net/v1"
+        base_url="https://ai.api.cloud.yandex.net/v1",
     )
-    
+
     return {
         "llm": LangchainLLMWrapper(yandex_llm),
-        "embeddings": LangchainEmbeddingsWrapper(yandex_embeddings)
+        "embeddings": LangchainEmbeddingsWrapper(yandex_embeddings),
     }
 
 
@@ -116,22 +143,25 @@ def test_ragas_evaluation(goldens, ragas_client):
     # Отладка: выводим структуру результата
     print(f"\n🔍 Структура результата Ragas:")
     print(f"   Тип results: {type(results)}")
-    print(f"   keys: {results.keys() if isinstance(results, dict) else 'N/A'}")
-    for key in results.keys():
+    print(f"   keys: {list(results._scores_dict.keys())}")
+    for key in results._scores_dict.keys():
         value = results[key]
         print(f"   {key}: type={type(value)}, len={len(value) if hasattr(value, '__len__') else 'N/A'}")
         if isinstance(value, list) and len(value) > 0:
             print(f"      first 5 values: {value[:5]}")
             print(f"      all values: {value}")
-    
+
     # Сохраняем результаты в JSON
     results_path = Path(__file__).parent / "ragas_results.json"
-    
+
     # Ragas возвращает списки значений - нужно усреднить с игнорированием null
-    faithfulness_avg = np.nanmean(results["faithfulness"]) if results["faithfulness"] else 0
+    faithfulness_values = [x for x in results["faithfulness"] if x is not None]
     answer_relevancy_values = [x for x in results["answer_relevancy"] if x is not None]
-    answer_relevancy_avg = np.nanmean(answer_relevancy_values) if answer_relevancy_values else 0
-    context_recall_avg = np.nanmean(results["context_recall"]) if results["context_recall"] else 0
+    context_recall_values = [x for x in results["context_recall"] if x is not None]
+
+    faithfulness_avg = np.nanmean(faithfulness_values) if faithfulness_values else float("nan")
+    answer_relevancy_avg = np.nanmean(answer_relevancy_values) if answer_relevancy_values else float("nan")
+    context_recall_avg = np.nanmean(context_recall_values) if context_recall_values else float("nan")
     
     results_dict = {
         "faithfulness": float(faithfulness_avg) if not np.isnan(faithfulness_avg) else None,

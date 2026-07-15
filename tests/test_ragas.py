@@ -34,7 +34,7 @@ def goldens():
 @pytest.fixture(scope="module")
 def ragas_client():
     """Настраивает Ragas для работы с YandexGPT."""
-    from ragas.lls import LangchainLLMWrapper
+    from ragas.llms import LangchainLLMWrapper
     from ragas.embeddings import LangchainEmbeddingsWrapper
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
     

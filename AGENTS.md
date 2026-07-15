@@ -15,6 +15,7 @@
 ## Технологический стек
 
 - **Язык:** Python 3.14 (задано в CI).
+- **Важно:** `ragas==0.2.14` зависит от `nest-asyncio`, который в CPython 3.14 ломает `asyncio.current_task()` внутри `asyncio.run`. Это приводит к `RuntimeError: Timeout should be used inside a task` и `NaN` у всех метрик. В `app/ragas_compat.py` `nest_asyncio.apply()` заменяется no-op до импорта `ragas`, поэтому используется стандартный `asyncio.run`.
 - **Основные зависимости:**
   - `ragas==0.2.14`
   - `langchain==1.3.13`, `langchain-core==1.4.9`, `langchain-openai==1.3.5`, `langchain-community==0.4.2`
@@ -56,6 +57,11 @@
 - `run(query)` — объединяет retrieval и generation, возвращает словарь `{query, response, contexts}`.
 - В конце модуля создаётся глобальный экземпляр `pipeline = IMDBRAGPipeline()`, который используется в тестах.
 
+### `app/ragas_compat.py`
+
+- Заглушки для удалённых модулей `langchain_community.chat_models.vertexai` / `langchain_community.llms.vertexai`, которые ragas 0.2.x всё ещё импортирует.
+- Отключение `nest_asyncio.apply()` для CPython 3.14 (см. раздел «Технологический стек»). Модуль должен импортироваться **до** `ragas`.
+
 ### `tests/test_ragas.py`
 
 - `goldens` (fixture, scope `module`) — загружает `tests/goldens.json`.
@@ -81,8 +87,8 @@
 Локально:
 
 ```bash
-# 0. Убедись, что используешь Python 3.11 (проект не тестировался на 3.14)
-python3.11 -m venv venv
+# 0. Убедись, что используешь Python 3.14
+python3.14 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 1. Установка зависимостей
@@ -123,7 +129,7 @@ pytest tests/ -v --html=report.html --self-contained-html
 - Триггеры: `push` в `main`/`master`, `pull_request` в `main`/`master`, ручной запуск (`workflow_dispatch`).
 - Шаги:
   1. Checkout.
-  2. Установка Python 3.11.
+  2. Установка Python 3.14.
   3. Установка зависимостей из `requirements.txt`.
   4. Запуск `pytest` с HTML-отчётом.
   5. Загрузка артефактов `ragas_results.json` и `report.html` (всегда, даже если тесты упали).

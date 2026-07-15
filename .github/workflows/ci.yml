@@ -29,6 +29,7 @@ jobs:
       env:
         YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
         YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+        PYTHONPATH: ${{ github.workspace }}
       run: |
         pytest tests/ -v --html=report.html --self-contained-html
     

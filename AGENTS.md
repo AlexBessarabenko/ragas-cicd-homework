@@ -21,7 +21,7 @@
   - `langchain==1.3.13`, `langchain-core==1.4.9`, `langchain-openai==1.3.5`, `langchain-community==0.4.2`
   - `chromadb==1.5.9`
   - `openai==2.45.0` (используется для совместимости с API YandexGPT)
-  - `datasets==5.0.0`, `pandas==3.0.3`
+  - `datasets==5.0.0`, `pandas==3.0.3`, `requests>=2.32.0`
   - `pytest==9.1.1`, `pytest-html==4.2.0`
   - `python-dotenv==1.2.2`
 - **Конфигурация зависимостей:** обычный `requirements.txt`. Никаких `pyproject.toml`, `setup.py`, `setup.cfg`, `tox.ini`, `pytest.ini` в репозитории нет.
@@ -65,7 +65,7 @@
 ### `tests/test_ragas.py`
 
 - `goldens` (fixture, scope `module`) — загружает `tests/goldens.json`.
-- `ragas_client` (fixture, scope `module`) — настраивает YandexGPT как evaluator LLM и Yandex embeddings для Ragas. Для LLM используется кастомный `YandexChatOpenAI`, который убирает из запроса поля `n`, `stop`, `stream`, `logprobs`, `reasoning` и др., неподдерживаемые YandexGPT OpenAI-совместимым API. Для embeddings используется `OpenAIEmbeddings(base_url="https://llm.api.cloud.yandex.net/v1", check_embedding_ctx_length=False)` — embeddings endpoint отличается от chat-completions и принимает строки в `input`.
+- `ragas_client` (fixture, scope `module`) — настраивает YandexGPT как evaluator LLM и Yandex embeddings для Ragas. Для LLM используется кастомный `YandexChatOpenAI`, который убирает из запроса поля `n`, `stop`, `stream`, `logprobs`, `reasoning` и др., неподдерживаемые YandexGPT OpenAI-совместимым API. Для embeddings используется кастомный `YandexEmbeddings`, который обращается к родному Yandex Text Embedding API (`https://ai.api.cloud.yandex.net/foundationModels/v1/textEmbedding`) с разными моделями для документов (`text-search-doc`) и запросов (`text-search-query`).
 - Тесты:
   1. `test_goldens_exist` — проверяет, что в `goldens.json` не менее 10 примеров.
   2. `test_rag_pipeline_returns_response` — дымовой тест, что пайплайн возвращает непустой ответ.
@@ -77,7 +77,7 @@
 | Метрика | Порог в тестах | Порог в CI |
 |---------|----------------|------------|
 | Faithfulness | `>= 0.7` | `>= 0.7` |
-| Answer Relevancy | `>= 0.6` | `>= 0.6` |
+| Answer Similarity | `>= 0.6` | `>= 0.6` |
 | Context Recall | `>= 0.6` | `>= 0.6` |
 
 Если метрика не вычислена (`null` / `NaN`), проверка пропускается и в лог пишется предупреждение.

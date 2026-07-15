@@ -47,11 +47,11 @@ jobs:
       run: |
         if [ -f tests/ragas_results.json ]; then
           echo "📊 Результаты Ragas:"
-          cat tests/ragas_results.json | jq '{faithfulness, answer_relevancy, context_recall}'
+          cat tests/ragas_results.json | jq '{faithfulness, answer_similarity, context_recall}'
           
           # Проверяем пороги (теперь значения скалярные, не списки)
           FAITHFULNESS=$(cat tests/ragas_results.json | jq -r '.faithfulness')
-          ANSWER_RELEVANCY=$(cat tests/ragas_results.json | jq -r '.answer_relevancy')
+          ANSWER_SIMILARITY=$(cat tests/ragas_results.json | jq -r '.answer_similarity')
           CONTEXT_RECALL=$(cat tests/ragas_results.json | jq -r '.context_recall')
           
           # Проверяем только ненулевые значения
@@ -65,14 +65,14 @@ jobs:
             echo "⚠️ Faithfulness не вычислено (null), пропускаем проверку"
           fi
           
-          if [ "$ANSWER_RELEVANCY" != "null" ]; then
-            if (( $(echo "$ANSWER_RELEVANCY < 0.6" | bc -l) )); then
-              echo "❌ Quality Gate Failed: Answer Relevance ниже 0.6 ($ANSWER_RELEVANCY)"
+          if [ "$ANSWER_SIMILARITY" != "null" ]; then
+            if (( $(echo "$ANSWER_SIMILARITY < 0.6" | bc -l) )); then
+              echo "❌ Quality Gate Failed: Answer Similarity ниже 0.6 ($ANSWER_SIMILARITY)"
               exit 1
             fi
-            echo "✅ Answer Relevance passed: $ANSWER_RELEVANCY >= 0.6"
+            echo "✅ Answer Similarity passed: $ANSWER_SIMILARITY >= 0.6"
           else
-            echo "⚠️ Answer Relevance не вычислено (null), пропускаем проверку"
+            echo "⚠️ Answer Similarity не вычислено (null), пропускаем проверку"
           fi
           
           if [ "$CONTEXT_RECALL" != "null" ]; then

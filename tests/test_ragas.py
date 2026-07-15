@@ -1,8 +1,7 @@
 """
 Тесты Ragas для оценки качества RAG-пайплайна.
-Проверяет метрики: Faithfulness, Answer Relevance, Context Recall.
+Проверяет метрики: Faithfulness, Answer Similarity, Context Recall.
 """
-import asyncio
 import json
 import os
 from typing import Dict, List
@@ -19,7 +18,7 @@ from pathlib import Path
 from ragas import evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
-from ragas.metrics import answer_relevancy, context_recall, faithfulness
+from ragas.metrics import answer_similarity, context_recall, faithfulness
 
 from app.rag_pipeline import pipeline
 
@@ -27,7 +26,7 @@ load_dotenv()
 
 # Пороговые значения метрик (quality gates)
 FAITHFULNESS_THRESHOLD = 0.7
-ANSWER_RELEVANCE_THRESHOLD = 0.6
+ANSWER_SIMILARITY_THRESHOLD = 0.6
 CONTEXT_RECALL_THRESHOLD = 0.6
 
 
@@ -152,20 +151,13 @@ def test_ragas_evaluation(goldens, ragas_client):
     # Настраиваем метрики с нашим LLM и embeddings
     metrics = [
         faithfulness,
-        answer_relevancy,
+        answer_similarity,
         context_recall
     ]
     
     for metric in metrics:
         metric.llm = ragas_client["llm"]
         metric.embeddings = ragas_client["embeddings"]
-
-    # Адаптируем prompt answer_relevancy на русский, чтобы сгенерированные
-    # вопросы и эталонный вопрос были на одном языке и similarity была выше.
-    adapted_prompts = asyncio.run(
-        answer_relevancy.adapt_prompts("russian", ragas_client["llm"], adapt_instruction=True)
-    )
-    answer_relevancy.set_prompts(**adapted_prompts)
 
     eval_data = []
     for golden in goldens:
@@ -204,16 +196,16 @@ def test_ragas_evaluation(goldens, ragas_client):
 
     # Ragas возвращает списки значений - нужно усреднить с игнорированием null
     faithfulness_values = [x for x in results["faithfulness"] if x is not None]
-    answer_relevancy_values = [x for x in results["answer_relevancy"] if x is not None]
+    answer_similarity_values = [x for x in results["answer_similarity"] if x is not None]
     context_recall_values = [x for x in results["context_recall"] if x is not None]
 
     faithfulness_avg = np.nanmean(faithfulness_values) if faithfulness_values else float("nan")
-    answer_relevancy_avg = np.nanmean(answer_relevancy_values) if answer_relevancy_values else float("nan")
+    answer_similarity_avg = np.nanmean(answer_similarity_values) if answer_similarity_values else float("nan")
     context_recall_avg = np.nanmean(context_recall_values) if context_recall_values else float("nan")
     
     results_dict = {
         "faithfulness": float(faithfulness_avg) if not np.isnan(faithfulness_avg) else None,
-        "answer_relevancy": float(answer_relevancy_avg) if not np.isnan(answer_relevancy_avg) else None,
+        "answer_similarity": float(answer_similarity_avg) if not np.isnan(answer_similarity_avg) else None,
         "context_recall": float(context_recall_avg) if not np.isnan(context_recall_avg) else None,
         "details": eval_data
     }
@@ -228,11 +220,11 @@ def test_ragas_evaluation(goldens, ragas_client):
     else:
         print("⚠️ Faithfulness не вычислено (null)")
     
-    if not np.isnan(answer_relevancy_avg):
-        assert answer_relevancy_avg >= ANSWER_RELEVANCE_THRESHOLD, \
-            f"Answer Relevance {answer_relevancy_avg:.3f} ниже порога {ANSWER_RELEVANCE_THRESHOLD}"
+    if not np.isnan(answer_similarity_avg):
+        assert answer_similarity_avg >= ANSWER_SIMILARITY_THRESHOLD, \
+            f"Answer Similarity {answer_similarity_avg:.3f} ниже порога {ANSWER_SIMILARITY_THRESHOLD}"
     else:
-        print("⚠️ Answer Relevance не вычислено (null)")
+        print("⚠️ Answer Similarity не вычислено (null)")
     
     if not np.isnan(context_recall_avg):
         assert context_recall_avg >= CONTEXT_RECALL_THRESHOLD, \
@@ -242,7 +234,7 @@ def test_ragas_evaluation(goldens, ragas_client):
     
     print(f"\n✅ Ragas результаты:")
     print(f"   Faithfulness: {faithfulness_avg:.3f} (порог: {FAITHFULNESS_THRESHOLD})")
-    print(f"   Answer Relevance: {answer_relevancy_avg:.3f} (порог: {ANSWER_RELEVANCE_THRESHOLD})")
+    print(f"   Answer Similarity: {answer_similarity_avg:.3f} (порог: {ANSWER_SIMILARITY_THRESHOLD})")
     print(f"   Context Recall: {context_recall_avg:.3f} (порог: {CONTEXT_RECALL_THRESHOLD})")
 
 

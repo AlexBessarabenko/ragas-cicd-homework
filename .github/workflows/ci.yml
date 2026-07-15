@@ -47,11 +47,11 @@ jobs:
       run: |
         if [ -f tests/ragas_results.json ]; then
           echo "📊 Результаты Ragas:"
-          cat tests/ragas_results.json | jq '{faithfulness, answer_similarity, context_recall}'
+          cat tests/ragas_results.json | jq '{faithfulness, semantic_similarity, context_recall}'
           
           # Проверяем пороги (теперь значения скалярные, не списки)
           FAITHFULNESS=$(cat tests/ragas_results.json | jq -r '.faithfulness')
-          ANSWER_SIMILARITY=$(cat tests/ragas_results.json | jq -r '.answer_similarity')
+          ANSWER_SIMILARITY=$(cat tests/ragas_results.json | jq -r '.semantic_similarity')
           CONTEXT_RECALL=$(cat tests/ragas_results.json | jq -r '.context_recall')
           
           # Проверяем только ненулевые значения
@@ -67,7 +67,7 @@ jobs:
           
           if [ "$ANSWER_SIMILARITY" != "null" ]; then
             if (( $(echo "$ANSWER_SIMILARITY < 0.6" | bc -l) )); then
-              echo "❌ Quality Gate Failed: Answer Similarity ниже 0.6 ($ANSWER_SIMILARITY)"
+              echo "❌ Quality Gate Failed: Answer Similarity (semantic_similarity) ниже 0.6 ($ANSWER_SIMILARITY)"
               exit 1
             fi
             echo "✅ Answer Similarity passed: $ANSWER_SIMILARITY >= 0.6"

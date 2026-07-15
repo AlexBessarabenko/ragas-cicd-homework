@@ -4,6 +4,8 @@
 """
 import json
 import os
+import threading
+import time
 from typing import Dict, List
 
 import app.ragas_compat  # noqa: F401  # заглушки для ragas 0.2.x + langchain 1.x
@@ -108,20 +110,26 @@ class YandexEmbeddings(Embeddings):
             "Authorization": f"Bearer {api_key}",
             "x-folder-id": folder_id,
         }
+        # Yandex Embeddings API возвращает 429 при слишком частых запросах.
+        # Делаем запросы последовательными с небольшой паузой.
+        self._lock = threading.Lock()
+        self._delay = 0.3
 
     def _model_uri(self, text_type: str) -> str:
         model = "text-search-doc" if text_type == "doc" else "text-search-query"
         return f"emb://{self.folder_id}/{model}/latest"
 
     def _embed(self, text: str, text_type: str) -> List[float]:
-        response = requests.post(
-            self.url,
-            json={"modelUri": self._model_uri(text_type), "text": text},
-            headers=self.headers,
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        return response.json()["embedding"]
+        with self._lock:
+            response = requests.post(
+                self.url,
+                json={"modelUri": self._model_uri(text_type), "text": text},
+                headers=self.headers,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            time.sleep(self._delay)
+            return response.json()["embedding"]
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return [self._embed(t, "doc") for t in texts]
@@ -194,9 +202,10 @@ def test_ragas_evaluation(goldens, ragas_client):
     # Сохраняем результаты в JSON
     results_path = Path(__file__).parent / "ragas_results.json"
 
-    # Ragas возвращает списки значений - нужно усреднить с игнорированием null
+    # Ragas возвращает списки значений - нужно усреднить с игнорированием null.
+    # AnswerSimilarity сохраняется под ключом "semantic_similarity".
     faithfulness_values = [x for x in results["faithfulness"] if x is not None]
-    answer_similarity_values = [x for x in results["answer_similarity"] if x is not None]
+    answer_similarity_values = [x for x in results["semantic_similarity"] if x is not None]
     context_recall_values = [x for x in results["context_recall"] if x is not None]
 
     faithfulness_avg = np.nanmean(faithfulness_values) if faithfulness_values else float("nan")
@@ -205,7 +214,7 @@ def test_ragas_evaluation(goldens, ragas_client):
     
     results_dict = {
         "faithfulness": float(faithfulness_avg) if not np.isnan(faithfulness_avg) else None,
-        "answer_similarity": float(answer_similarity_avg) if not np.isnan(answer_similarity_avg) else None,
+        "semantic_similarity": float(answer_similarity_avg) if not np.isnan(answer_similarity_avg) else None,
         "context_recall": float(context_recall_avg) if not np.isnan(context_recall_avg) else None,
         "details": eval_data
     }

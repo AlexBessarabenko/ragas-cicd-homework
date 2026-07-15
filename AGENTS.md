@@ -65,7 +65,7 @@
 ### `tests/test_ragas.py`
 
 - `goldens` (fixture, scope `module`) — загружает `tests/goldens.json`.
-- `ragas_client` (fixture, scope `module`) — настраивает YandexGPT как evaluator LLM и Yandex embeddings для Ragas. Для LLM используется кастомный `YandexChatOpenAI`, который убирает из запроса поля `n`, `stop`, `stream`, `logprobs`, `reasoning` и др., неподдерживаемые YandexGPT OpenAI-совместимым API. Для embeddings используется кастомный `YandexEmbeddings`, который обращается к родному Yandex Text Embedding API (`https://ai.api.cloud.yandex.net/foundationModels/v1/textEmbedding`) с разными моделями для документов (`text-search-doc`) и запросов (`text-search-query`).
+- `ragas_client` (fixture, scope `module`) — настраивает YandexGPT как evaluator LLM и Yandex embeddings для Ragas. Для LLM используется кастомный `YandexChatOpenAI`, который убирает из запроса поля `n`, `stop`, `stream`, `logprobs`, `reasoning` и др., неподдерживаемые YandexGPT OpenAI-совместимым API. Для embeddings используется кастомный `YandexEmbeddings`, который обращается к родному Yandex Text Embedding API (`https://ai.api.cloud.yandex.net/foundationModels/v1/textEmbedding`) с разными моделями для документов (`text-search-doc`) и запросов (`text-search-query`). Запросы в `YandexEmbeddings` делаются последовательно с паузой, чтобы избежать 429 Too Many Requests.
 - Тесты:
   1. `test_goldens_exist` — проверяет, что в `goldens.json` не менее 10 примеров.
   2. `test_rag_pipeline_returns_response` — дымовой тест, что пайплайн возвращает непустой ответ.
@@ -77,7 +77,7 @@
 | Метрика | Порог в тестах | Порог в CI |
 |---------|----------------|------------|
 | Faithfulness | `>= 0.7` | `>= 0.7` |
-| Answer Similarity | `>= 0.6` | `>= 0.6` |
+| Answer Similarity (`semantic_similarity`) | `>= 0.6` | `>= 0.6` |
 | Context Recall | `>= 0.6` | `>= 0.6` |
 
 Если метрика не вычислена (`null` / `NaN`), проверка пропускается и в лог пишется предупреждение.

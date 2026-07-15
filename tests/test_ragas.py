@@ -113,6 +113,17 @@ def test_ragas_evaluation(goldens, ragas_client):
         embeddings=ragas_client["embeddings"]
     )
     
+    # Отладка: выводим структуру результата
+    print(f"\n🔍 Структура результата Ragas:")
+    print(f"   Тип results: {type(results)}")
+    print(f"   keys: {results.keys() if isinstance(results, dict) else 'N/A'}")
+    for key in results.keys():
+        value = results[key]
+        print(f"   {key}: type={type(value)}, len={len(value) if hasattr(value, '__len__') else 'N/A'}")
+        if isinstance(value, list) and len(value) > 0:
+            print(f"      first 5 values: {value[:5]}")
+            print(f"      all values: {value}")
+    
     # Сохраняем результаты в JSON
     results_path = Path(__file__).parent / "ragas_results.json"
     

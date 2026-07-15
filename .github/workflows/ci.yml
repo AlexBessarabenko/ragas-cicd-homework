@@ -1,0 +1,60 @@
+name: Ragas CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run Ragas tests
+      env:
+        YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+        YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+      run: |
+        pytest tests/ -v --html=report.html --self-contained-html
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ragas-test-results
+        path: |
+          tests/ragas_results.json
+          report.html
+    
+    - name: Quality Gate Check
+      if: always()
+      run: |
+        if [ -f tests/ragas_results.json ]; then
+          echo "📊 Результаты Ragas:"
+          cat tests/ragas_results.json | jq '{faithfulness, answer_relevancy, context_recall}'
+          
+          # Проверяем пороги
+          FAITHFULNESS=$(cat tests/ragas_results.json | jq -r '.faithfulness')
+          if (( $(echo "$FAITHFULNESS < 0.7" | bc -l) )); then
+            echo "❌ Quality Gate Failed: Faithfulness ниже 0.7"
+            exit 1
+          fi
+          echo "✅ Quality Gate Passed"
+        else
+          echo "⚠️ Файл результатов не найден"
+        fi

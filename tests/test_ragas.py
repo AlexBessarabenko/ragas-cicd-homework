@@ -80,10 +80,11 @@ def ragas_client():
     # check_embedding_ctx_length=False нужен, потому что Yandex Embeddings API
     # принимает строки в поле input, а не токены (list[int]), которые
     # langchain-openai отправляет при включённой проверке длины контекста.
+    # Базовый URL embeddings отличается от chat-completions.
     yandex_embeddings = OpenAIEmbeddings(
         model=f"emb://{FOLDER_ID}/text-search-doc/latest",
         api_key=API_KEY,
-        base_url="https://ai.api.cloud.yandex.net/v1",
+        base_url="https://llm.api.cloud.yandex.net/v1",
         check_embedding_ctx_length=False,
     )
 

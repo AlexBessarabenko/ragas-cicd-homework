@@ -9,9 +9,11 @@ from typing import Dict, List
 import app.ragas_compat  # noqa: F401  # заглушки для ragas 0.2.x + langchain 1.x
 import numpy as np
 import pytest
+import requests
 from datasets import Dataset
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.embeddings import Embeddings
+from langchain_openai import ChatOpenAI
 from pathlib import Path
 from ragas import evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -76,22 +78,56 @@ def ragas_client():
         base_url="https://ai.api.cloud.yandex.net/v1",
     )
 
-    # Для embeddings используем Yandex embeddings.
-    # check_embedding_ctx_length=False нужен, потому что Yandex Embeddings API
-    # принимает строки в поле input, а не токены (list[int]), которые
-    # langchain-openai отправляет при включённой проверке длины контекста.
-    # Базовый URL embeddings отличается от chat-completions.
-    yandex_embeddings = OpenAIEmbeddings(
-        model=f"emb://{FOLDER_ID}/text-search-doc/latest",
+    # Для embeddings используем родной Yandex API, т.к. OpenAI-совместимый
+    # эндпоинт Yandex для embeddings не работает стабильно через langchain-openai.
+    yandex_embeddings = YandexEmbeddings(
         api_key=API_KEY,
-        base_url="https://llm.api.cloud.yandex.net/v1",
-        check_embedding_ctx_length=False,
+        folder_id=FOLDER_ID,
     )
 
     return {
         "llm": LangchainLLMWrapper(yandex_llm),
         "embeddings": LangchainEmbeddingsWrapper(yandex_embeddings),
     }
+
+
+class YandexEmbeddings(Embeddings):
+    """
+    Обёртка над родным Yandex Text Embedding API.
+    Использует разные модели для документов (text-search-doc) и запросов
+    (text-search-query), как рекомендуется в документации Yandex.
+    """
+
+    def __init__(self, api_key: str, folder_id: str, timeout: float = 60.0):
+        self.api_key = api_key
+        self.folder_id = folder_id
+        self.timeout = timeout
+        self.url = "https://ai.api.cloud.yandex.net/foundationModels/v1/textEmbedding"
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "x-folder-id": folder_id,
+        }
+
+    def _model_uri(self, text_type: str) -> str:
+        model = "text-search-doc" if text_type == "doc" else "text-search-query"
+        return f"emb://{self.folder_id}/{model}/latest"
+
+    def _embed(self, text: str, text_type: str) -> List[float]:
+        response = requests.post(
+            self.url,
+            json={"modelUri": self._model_uri(text_type), "text": text},
+            headers=self.headers,
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()["embedding"]
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return [self._embed(t, "doc") for t in texts]
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed(text, "query")
 
 
 def test_goldens_exist(goldens):

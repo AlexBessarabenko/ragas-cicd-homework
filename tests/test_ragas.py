@@ -114,10 +114,17 @@ def test_ragas_evaluation(goldens, ragas_client):
     
     # Сохраняем результаты в JSON
     results_path = Path(__file__).parent / "ragas_results.json"
+    
+    # Ragas возвращает списки значений - нужно усреднить
+    faithfulness_avg = sum(results["faithfulness"]) / len(results["faithfulness"]) if results["faithfulness"] else 0
+    answer_relevancy_values = [x for x in results["answer_relevancy"] if x is not None]
+    answer_relevancy_avg = sum(answer_relevancy_values) / len(answer_relevancy_values) if answer_relevancy_values else 0
+    context_recall_avg = sum(results["context_recall"]) / len(results["context_recall"]) if results["context_recall"] else 0
+    
     results_dict = {
-        "faithfulness": results["faithfulness"],
-        "answer_relevancy": results["answer_relevancy"],
-        "context_recall": results["context_recall"],
+        "faithfulness": faithfulness_avg,
+        "answer_relevancy": answer_relevancy_avg,
+        "context_recall": context_recall_avg,
         "details": eval_data
     }
     
@@ -125,19 +132,19 @@ def test_ragas_evaluation(goldens, ragas_client):
         json.dump(results_dict, f, ensure_ascii=False, indent=2)
     
     # Проверяем пороги (quality gates)
-    assert results["faithfulness"] >= FAITHFULNESS_THRESHOLD, \
-        f"Faithfulness {results['faithfulness']:.3f} ниже порога {FAITHFULNESS_THRESHOLD}"
+    assert faithfulness_avg >= FAITHFULNESS_THRESHOLD, \
+        f"Faithfulness {faithfulness_avg:.3f} ниже порога {FAITHFULNESS_THRESHOLD}"
     
-    assert results["answer_relevancy"] >= ANSWER_RELEVANCE_THRESHOLD, \
-        f"Answer Relevance {results['answer_relevancy']:.3f} ниже порога {ANSWER_RELEVANCE_THRESHOLD}"
+    assert answer_relevancy_avg >= ANSWER_RELEVANCE_THRESHOLD, \
+        f"Answer Relevance {answer_relevancy_avg:.3f} ниже порога {ANSWER_RELEVANCE_THRESHOLD}"
     
-    assert results["context_recall"] >= CONTEXT_RECALL_THRESHOLD, \
-        f"Context Recall {results['context_recall']:.3f} ниже порога {CONTEXT_RECALL_THRESHOLD}"
+    assert context_recall_avg >= CONTEXT_RECALL_THRESHOLD, \
+        f"Context Recall {context_recall_avg:.3f} ниже порога {CONTEXT_RECALL_THRESHOLD}"
     
     print(f"\n✅ Ragas результаты:")
-    print(f"   Faithfulness: {results['faithfulness']:.3f} (порог: {FAITHFULNESS_THRESHOLD})")
-    print(f"   Answer Relevance: {results['answer_relevancy']:.3f} (порог: {ANSWER_RELEVANCE_THRESHOLD})")
-    print(f"   Context Recall: {results['context_recall']:.3f} (порог: {CONTEXT_RECALL_THRESHOLD})")
+    print(f"   Faithfulness: {faithfulness_avg:.3f} (порог: {FAITHFULNESS_THRESHOLD})")
+    print(f"   Answer Relevance: {answer_relevancy_avg:.3f} (порог: {ANSWER_RELEVANCE_THRESHOLD})")
+    print(f"   Context Recall: {context_recall_avg:.3f} (порог: {CONTEXT_RECALL_THRESHOLD})")
 
 
 def test_no_hallucinations(goldens, ragas_client):
@@ -168,8 +175,11 @@ def test_no_hallucinations(goldens, ragas_client):
         embeddings=ragas_client["embeddings"]
     )
     
-    # Faithfulness должен быть высоким (ответ не выдуман)
-    assert results["faithfulness"] >= 0.8, \
-        f"Модель галлюцинирует! Faithfulness: {results['faithfulness']:.3f}"
+    # Ragas возвращает список значений - берём первое
+    faithfulness_value = results["faithfulness"][0] if results["faithfulness"] else 0
     
-    print(f"\n✅ Тест на галлюцинации пройден. Faithfulness: {results['faithfulness']:.3f}")
+    # Faithfulness должен быть высоким (ответ не выдуман)
+    assert faithfulness_value >= 0.8, \
+        f"Модель галлюцинирует! Faithfulness: {faithfulness_value:.3f}"
+    
+    print(f"\n✅ Тест на галлюцинации пройден. Faithfulness: {faithfulness_value:.3f}")

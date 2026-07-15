@@ -49,12 +49,26 @@ jobs:
           echo "📊 Результаты Ragas:"
           cat tests/ragas_results.json | jq '{faithfulness, answer_relevancy, context_recall}'
           
-          # Проверяем пороги
+          # Проверяем пороги (теперь значения скалярные, не списки)
           FAITHFULNESS=$(cat tests/ragas_results.json | jq -r '.faithfulness')
+          ANSWER_RELEVANCY=$(cat tests/ragas_results.json | jq -r '.answer_relevancy')
+          CONTEXT_RECALL=$(cat tests/ragas_results.json | jq -r '.context_recall')
+          
           if (( $(echo "$FAITHFULNESS < 0.7" | bc -l) )); then
-            echo "❌ Quality Gate Failed: Faithfulness ниже 0.7"
+            echo "❌ Quality Gate Failed: Faithfulness ниже 0.7 ($FAITHFULNESS)"
             exit 1
           fi
+          
+          if (( $(echo "$ANSWER_RELEVANCY < 0.6" | bc -l) )); then
+            echo "❌ Quality Gate Failed: Answer Relevance ниже 0.6 ($ANSWER_RELEVANCY)"
+            exit 1
+          fi
+          
+          if (( $(echo "$CONTEXT_RECALL < 0.6" | bc -l) )); then
+            echo "❌ Quality Gate Failed: Context Recall ниже 0.6 ($CONTEXT_RECALL)"
+            exit 1
+          fi
+          
           echo "✅ Quality Gate Passed"
         else
           echo "⚠️ Файл результатов не найден"

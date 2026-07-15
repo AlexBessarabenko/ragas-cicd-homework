@@ -19,7 +19,8 @@ RAG-система на базе:
 
 ## 📁 Структура проекта
 ├── app/
-│ └── rag_pipeline.py # RAG-приложение
+│ ├── rag_pipeline.py # RAG-приложение
+│ └── ragas_compat.py # совместимость ragas с Python 3.14 / langchain-community
 ├── tests/
 │ ├── goldens.json # 10 эталонных примеров
 │ └── test_ragas.py # Pytest + Ragas тесты
@@ -62,7 +63,7 @@ pytest tests/ -v --html=report.html
 
 ### Шаги пайплайна:
 1. **Checkout** — загрузка кода
-2. **Setup Python** — установка Python 3.11
+2. **Setup Python** — установка Python 3.14
 3. **Install dependencies** — установка зависимостей
 4. **Run Ragas tests** — запуск pytest с генерацией HTML-отчета
 5. **Upload artifacts** — сохранение `ragas_results.json` и `report.html`

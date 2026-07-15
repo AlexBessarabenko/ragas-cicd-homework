@@ -44,6 +44,8 @@ Thumbs.db
 .coverage
 htmlcov/
 .tox/
+report.html
+tests/ragas_results.json
 
 # Documentation
 docs/_build/
